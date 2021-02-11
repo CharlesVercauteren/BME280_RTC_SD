@@ -1,7 +1,8 @@
 
-// Weather_BME280_RTC_SD
+// BME280_RTC_SD
 //
 // ©2021 Charles Vercauteren
+// 11 februari 2021
 
 #define LOG_INTERVAL   15    // Minuten, moet <60
 
@@ -9,7 +10,7 @@
 #include <Wire.h>
 #include <SPI.h>
 #include <Adafruit_BME280.h>
-Adafruit_BME280 bmp;
+Adafruit_BME280 bme;
 
 // SD-Card
 #include <SPI.h>
@@ -28,6 +29,7 @@ const int chipSelect = 10;
 
 // Allerlei
 bool runOnce = false;
+
 //File logFile;
 int logInterval = LOG_INTERVAL;
 DateTime now;
@@ -37,15 +39,15 @@ void setup() {
   //Allerlei setup
   Serial.begin(9600);
   Serial.println();
-  Serial.println(F("Weather_BME280_RTC_SD."));
-  Serial.println(F("----------------------"));
+  Serial.println(F("BME280_RTC_SD."));
+  Serial.println(F("-------------"));
 
   // BME280 setup.
   // -------------
   // Sensor zit op I2C adres 0x76
   // Sensor ID is 0x60
 
-  if (!bmp.begin(0x76)) {
+  if (!bme.begin(0x76)) {
     Serial.println(F("No sensor found, stopping"));
     while (1);
   }
@@ -53,7 +55,7 @@ void setup() {
     Serial.println(F("BME280 sensor found."));
   }
    // Default settings from datasheet.
-  bmp.setSampling(Adafruit_BME280::MODE_NORMAL,     // Operating Mode. 
+  bme.setSampling(Adafruit_BME280::MODE_NORMAL,     // Operating Mode. 
                   Adafruit_BME280::SAMPLING_X2,     // Temp. oversampling 
                   Adafruit_BME280::SAMPLING_X16,    // Pressure oversampling 
                   Adafruit_BME280::SAMPLING_X16,    // Humidity 
@@ -102,12 +104,7 @@ void loop(void) {
 
     Serial.print("Log interval: ");
     Serial.println(logInterval);
-    /*
-    Serial.println(); 
-    Serial.println("Inhoud SD-card: ");
-    rootDir = SD.open("/");
-    printDirectory(rootDir, 0);
-    rootDir.close();*/
+  
   }
 
   // Tijd om te loggen ?
@@ -144,10 +141,12 @@ String buildFileNameString(){
   if (now.day() < 10) { temp += "0";}
   temp += String(now.day()) + ".txt";
   /*
+  // Debug
   if (now.day() < 10) { temp += "0";}
   temp += String(now.day());
   if (now.hour() < 10) { temp += "0";}
-  temp += String(now.hour()) + ".txt";*/
+  temp += String(now.hour()) + ".txt";
+  */
   
   return temp;
 }
@@ -163,9 +162,9 @@ String readSensorAndLog(String fileName) {
   //strcpy(file, fileName.c_str());
 
   // Lees sensor
-  tempData = String(bmp.readTemperature());
-  pressData = String(bmp.readPressure()/100); // In hPa
-  humiData = String(bmp.readHumidity());
+  tempData = String(bme.readTemperature());
+  pressData = String(bme.readPressure()/100); // In hPa
+  humiData = String(bme.readHumidity());
     
   // Bouw te loggen string
   logString = timeString + "\t" + tempData + "\t" + pressData + "\t" + humiData + "\n";
