@@ -4,7 +4,12 @@
 // ©2021 Charles Vercauteren
 // 11 februari 2021
 
-#define LOG_INTERVAL   15    // Minuten, moet <60
+// Tested with:
+//   - Arduino Uno
+//   - Adafruit Datalogging shield
+//   - BME280 temperature/pressure/humidity sensor connected to I2C
+
+#define LOG_INTERVAL   2    // Minutes, > 1 and <60
 
 // BME280
 #include <Wire.h>
@@ -15,28 +20,22 @@ Adafruit_BME280 bme;
 // SD-Card
 #include <SPI.h>
 #include <SD.h>
-Sd2Card card;
-SdVolume volume;
+SDClass card;
 SdFile root;
-//char file[64] = "dummy";
-
 
 // RTC
 #include "RTClib.h"
 RTC_PCF8523 rtc;
-
 const int chipSelect = 10;
 
-// Allerlei
+// Diverse
 bool runOnce = false;
-
-//File logFile;
 int logInterval = LOG_INTERVAL;
 DateTime now;
 
 
 void setup() {
-  //Allerlei setup
+  //Diverse setup
   Serial.begin(9600);
   Serial.println();
   Serial.println(F("BME280_RTC_SD."));
@@ -44,7 +43,7 @@ void setup() {
 
   // BME280 setup.
   // -------------
-  // Sensor zit op I2C adres 0x76
+  // Sensor is on I2C address 0x76
   // Sensor ID is 0x60
 
   if (!bme.begin(0x76)) {
@@ -64,7 +63,7 @@ void setup() {
 
   // SD-card setup.
   // --------------
-  if (!card.init(SPI_HALF_SPEED, chipSelect)) {
+  if (!card.begin()) {
     Serial.println(F("No SD card found, stopping."));
     while(1);
   }
@@ -81,12 +80,12 @@ void setup() {
     while(1);
   }
   Serial.println(F("Real Time Clock found."));
+  
   if (! rtc.initialized() || rtc.lostPower()) {
     Serial.println(F("RTC is NOT initialized, let's set the time!"));
-    // Set datum en tijd op compilatiemoment.
+    // Set date and time to moment of compilation
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   }
-  
 }
 
 void loop(void) {
@@ -95,36 +94,38 @@ void loop(void) {
   String fileName;
   String logString;
   static DateTime prevNow;
-  //String timeString, dateString, logString;
   sensors_event_t temp_event, pressure_event, humidity_event;
 
-  // Toon inhoud SD-Card
+  // Code executed once
   if (!runOnce) {
     runOnce = true;
 
+    Serial.println();
     Serial.print("Log interval: ");
     Serial.println(logInterval);
-  
+
+    Serial.println();
+    Serial.println("Time\t\tTemp\tPress\tHumi\t\tFile / Size:");
   }
 
-  // Tijd om te loggen ?
+  // Time to log ?
   prevNow = now;
   now = rtc.now();
   if (now.minute()%logInterval == 0 && prevNow.minute()%logInterval != now.minute()%logInterval) {
-    Serial.println("\nLogging.");
     
     fileName = buildFileNameString();
-    Serial.print("Bestandsnaam: "); Serial.println(fileName);
-
-    // Meet en log sensorgegevens
-    logString = readSensorAndLog(fileName);
-    Serial.println("Tijd, temperatuur, druk en vochtigheid: ");
-    Serial.println(logString);
+ 
+    // Get&show sensor data
+    logString = readSensorAndSaveToLog(fileName);
+    Serial.print(logString);
+    Serial.print("\t\t");
+    Serial.print(fileName);
     
     // Toon bestandsgrootte
-    Serial.print("Bestandsgrootte: ");
     logFile = SD.open(fileName.c_str(),FILE_READ);
-    Serial.println(logFile.size());
+    Serial.print(" / ");
+    Serial.print(logFile.size());
+    Serial.println();
     logFile.close();
     }
 
@@ -140,42 +141,36 @@ String buildFileNameString(){
   temp += String(now.month());
   if (now.day() < 10) { temp += "0";}
   temp += String(now.day()) + ".txt";
-  /*
-  // Debug
-  if (now.day() < 10) { temp += "0";}
-  temp += String(now.day());
-  if (now.hour() < 10) { temp += "0";}
-  temp += String(now.hour()) + ".txt";
-  */
   
   return temp;
 }
 
-String readSensorAndLog(String fileName) {
+String readSensorAndSaveToLog(String fileName) {
+  // Returns time and sensor data as a string.
+  // timeString + "\t" + tempData + "\t" + pressData + "\t" + humiData
   File logFile;
   String tempData, pressData, humiData;
-  String logString;
+  String dataString, logString;
   
   String timeString = buildTimeString();
   String dateString = buildDateString();
 
-  //strcpy(file, fileName.c_str());
 
   // Lees sensor
   tempData = String(bme.readTemperature());
-  pressData = String(bme.readPressure()/100); // In hPa
+  pressData = String(bme.readPressure()/100, 0); // In hPa
   humiData = String(bme.readHumidity());
     
   // Bouw te loggen string
-  logString = timeString + "\t" + tempData + "\t" + pressData + "\t" + humiData + "\n";
+  dataString = timeString + "\t" + tempData + "\t" + pressData + "\t" + humiData;
+  logString = dataString + "\n";
 
-  
   // Schrijf naar SD-card
   logFile = SD.open(fileName.c_str(),FILE_WRITE);
   logFile.write(logString.c_str());
   logFile.close();
 
-  return logString;
+  return dataString;
 
 }
 
@@ -205,32 +200,3 @@ String buildDateString() {
 
     return temp;
 }
-/*
-void printDirectory(File dir, int numTabs) {
-
-  while (true) {
-    File entry =  dir.openNextFile();
-    if (! entry) {
-      // no more files
-      break;
-    }
-
-    for (uint8_t i = 0; i < numTabs; i++) {
-      Serial.print('\t');
-    }
-
-    Serial.print(entry.name());
-
-    if (entry.isDirectory()) {
-      Serial.println("/");
-      printDirectory(entry, numTabs + 1);
-    } 
-    else {
-      // files have sizes, directories do not
-      Serial.print("\t\t");
-      Serial.println(entry.size(), DEC);
-    }
-    entry.close();
-
-    }
-}*/
