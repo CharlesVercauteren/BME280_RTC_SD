@@ -2,14 +2,14 @@
 // BME280_RTC_SD
 //
 // ©2021 Charles Vercauteren
-// 11 februari 2021
+// 17 februari 2021
 
 // Tested with:
 //   - Arduino Uno
 //   - Adafruit Datalogging shield
 //   - BME280 temperature/pressure/humidity sensor connected to I2C
 
-#define LOG_INTERVAL   2    // Minutes, > 1 and <60
+#define LOG_INTERVAL   15    // Minutes, > 1 and <60
 
 // BME280
 #include <Wire.h>
@@ -121,22 +121,20 @@ void loop(void) {
     Serial.print("\t\t");
     Serial.print(fileName);
     
-    // Toon bestandsgrootte
+    // Show filesize
     logFile = SD.open(fileName.c_str(),FILE_READ);
     Serial.print(" / ");
     Serial.print(logFile.size());
     Serial.println();
     logFile.close();
     }
-
 }
 
 String buildFileNameString(){
-  // Moet voldoen aan 8.3 --> werkt anders niet !!!
-  // Maak string "jjjjmmdd.csv"
+  // Filename must conform 8.3 --> doesn't work otherwise !!!
+  // Create date string "mmdd.txt"
   String temp = "";
   
-  //temp += String(now.year());
   if (now.month() < 10) { temp += "0";}
   temp += String(now.month());
   if (now.day() < 10) { temp += "0";}
@@ -153,29 +151,26 @@ String readSensorAndSaveToLog(String fileName) {
   String dataString, logString;
   
   String timeString = buildTimeString();
-  String dateString = buildDateString();
 
-
-  // Lees sensor
+  // Read sensor
   tempData = String(bme.readTemperature());
   pressData = String(bme.readPressure()/100, 0); // In hPa
   humiData = String(bme.readHumidity());
     
-  // Bouw te loggen string
+  // Build string to log
   dataString = timeString + "\t" + tempData + "\t" + pressData + "\t" + humiData;
   logString = dataString + "\n";
 
-  // Schrijf naar SD-card
+  // Write to SD-card
   logFile = SD.open(fileName.c_str(),FILE_WRITE);
   logFile.write(logString.c_str());
   logFile.close();
 
   return dataString;
-
 }
 
 String buildTimeString() {
-  // Maak string huidige tijd vd vorm hh:mm:ss
+  // Create time string: "hh:mm:ss"
   String temp = "";
   
   if (now.hour() < 10) { temp += "0";}
@@ -184,19 +179,6 @@ String buildTimeString() {
     temp += String(now.minute()) + ":";
     if (now.second() < 10) { temp += "0";}
     temp += String(now.second());
-
-    return temp;
-}
-
-String buildDateString() {
-  // Maak string van huidige datum in de vorm dd/mm/jjjj
-    String temp = "";
-  
-  if (now.day() < 10) { temp += "0";}
-    temp += String(now.day()) + "/";
-    if (now.month() < 10) { temp += "0";}
-    temp += String(now.month()) + "/";
-    temp += String(now.year());
 
     return temp;
 }
